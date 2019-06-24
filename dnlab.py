@@ -20,6 +20,10 @@ bin_size = .01
 training_prop=.5
 resolution = .0001
 
+frcc=mdl.FRCC()
+trailing_type = frcc.trailing_type
+trailing_param = frcc.get_trailing_param(trailing_type)
+stats_test = frcc.stats_test
 
 # defines the BinnedData object
 class BinnedData(mdl.SpikeData):
@@ -111,7 +115,7 @@ def get_adaptation_rate(SpikeData):
         ele_rates=[]
         for j in stim_arr:
             stim_data=ele_data.get_kw_SpikeData(stim=j)
-            fr=mdl.firing_rate(stim_data.spikes)
+            fr=stim_data.firing_rates(trailing_type, trailing_param, fr_type = 2)
             ar=mdl.robust_adaptation_rate(fr[5:26])
             ele_rates.append(ar)
         adaptation_rates[i]=np.mean(ele_rates)
@@ -127,7 +131,7 @@ def get_stim_adaptation_rate(SpikeData):
         ele_rates=[]
         for stim in ele_stim:
             stim_data=ele_data.get_kw_SpikeData(stim=stim)
-            fr=mdl.firing_rate(stim_data.spikes[5:26])
+            fr=stim_data.firing_rates(trailing_type, trailing_param, fr_type = 2)
             ar=mdl.adaptation_rate(fr)
             ele_rates.append(ar)
         adaptation_rates.append(ele_rates)
@@ -239,13 +243,10 @@ def convert_electrodes(split_data, n = 100):
     return
 
 # does the knn algorithm on an array of experiments
-def batch_decoding_accuracy(split_data, bird_ele_class, n_neighbors=15, reps=250, training=.5):
+def batch_decoding_accuracy(split_data, n_neighbors=15, reps=250, training=.5):
     # Runs the decoding accuracy KNN algorithm on an array of spike data objects
     # split_data is the spike data array, bird_ele_class is a dataframe containing all responding electrodes and the 
-    # region they are from.
-    
-    # bird tag should be set to the tag of birds in the experiments you are using
-    
+    # region they are from.    
     # n neighbors is the amount of neighbors for the knn algorithm
     # reps is the amount of repitions of the algorithm to run
     # training is the training proportion
@@ -259,9 +260,6 @@ def batch_decoding_accuracy(split_data, bird_ele_class, n_neighbors=15, reps=250
         bird_tag = chr(int(str(spike_data.birdid[0])[0:2])) + chr(int(str(spike_data.birdid[0])[2:4]))
         bird_id = bird_tag + str(spike_data.birdid[0])[-5:-2]
         for x, ele_num in enumerate(ele_num_arr):
-            df = bird_ele_class[(bird_ele_class['birdid'] == bird_id) & (bird_ele_class['electrode'] == ele_num)]
-            if df.empty:
-                continue
             ele_spike_data = spike_data.get_kw_SpikeData(electrode = ele_num)
             ele_binned_data = Spike_to_Binned(ele_spike_data)
             decoding_acc = decoding_accuracy(ele_binned_data, k=n_neighbors, rep_num=reps, training_prop=training)
@@ -292,3 +290,38 @@ def get_multi_units(spike_data):
             tmp = spike_data.get_kw_SpikeData(electrode = ele)
             multi_units.append(tmp)
     return multi_units
+
+def site_check(site_data, frcc=frcc):
+    trailing_type = frcc.trailing_type
+    trailing_param = frcc.get_trailing_param(trailing_type)
+    p_values = []
+    for stim in site_data.stim:
+        stim_data = site_data.get_kw_SpikeData(stim = stim)
+        baseline = stim_data.firing_rates(trailing_type, trailing_param, fr_type = 0)
+        stimulus = stim_data.firing_rates(trailing_type, trailing_param, fr_type = 1)
+        #statistics, p_value = sst.wilcoxon(baseline, stimulus)
+        statistics, p_value = sst.ttest_rel(baseline, stimulus)
+        #print baseline.shape
+        p_values.append(p_value)
+    return np.asarray(p_values)
+
+# loop through spike data
+# loop through electrodes
+# check if electrode is responding
+# if responding, add header and spike
+# combine at the end
+def res_filter(split_data, p_value= 0.05):
+    # to prevent enormous amount of warnings
+    import warnings; warnings.simplefilter('ignore')
+    res_split_data = []
+    for spike_data in split_data:
+        res_ele = []
+        for ele in spike_data.electrodes:
+            ele_spike_data = spike_data.get_kw_SpikeData(electrode=ele)
+            respond = site_check(ele_spike_data)
+            r = respond < p_value
+            if np.any(r) and not np.any(np.isnan((respond))):
+                res_ele.append(ele)
+        res_data = spike_data.get_kw_SpikeData(electrode = res_ele)
+        res_split_data.append(res_data)
+    return res_split_data
