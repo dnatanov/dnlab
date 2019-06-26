@@ -115,8 +115,8 @@ def get_adaptation_rate(SpikeData):
         ele_rates=[]
         for j in stim_arr:
             stim_data=ele_data.get_kw_SpikeData(stim=j)
-            fr=stim_data.firing_rates(trailing_type, trailing_param, fr_type = 2)
-            ar=mdl.robust_adaptation_rate(fr[5:26])
+            fr=stim_data.firing_rates(trailing_type, trailing_param, fr_type = 1)
+            ar=mdl.adaptation_rate(fr)
             ele_rates.append(ar)
         adaptation_rates[i]=np.mean(ele_rates)
     return adaptation_rates
@@ -274,43 +274,26 @@ def batch_decoding_accuracy(split_data, n_neighbors=15, reps=250, training=.5):
         n+=1
     return final_df.reset_index(drop=True)
 
-
-def get_single_units(spike_data):
-    single_units = []
-    for ele in np.unique(sd.electrodes):
-        if ele%100 != 0:
-            tmp = spike_data.get_kw_SpikeData(electrode = ele)
-            single_units.append(tmp)
-    return single_units
-
-def get_multi_units(spike_data):
-    multi_units = []
-    for ele in np.unique(sd.electrodes):
-        if ele%100 == 0:
-            tmp = spike_data.get_kw_SpikeData(electrode = ele)
-            multi_units.append(tmp)
-    return multi_units
-
+# Checks an individual site/electrode to see if it responds to any stimuli
+# To implement: options for statistical test
 def site_check(site_data, frcc=frcc):
     trailing_type = frcc.trailing_type
     trailing_param = frcc.get_trailing_param(trailing_type)
     p_values = []
     for stim in site_data.stim:
         stim_data = site_data.get_kw_SpikeData(stim = stim)
-        baseline = stim_data.firing_rates(trailing_type, trailing_param, fr_type = 0)
-        stimulus = stim_data.firing_rates(trailing_type, trailing_param, fr_type = 1)
+        #baseline = stim_data.firing_rates(trailing_type, trailing_param, fr_type = 0)
+        #stimulus = stim_data.firing_rates(trailing_type, trailing_param, fr_type = 1)
         #statistics, p_value = sst.wilcoxon(baseline, stimulus)
-        statistics, p_value = sst.ttest_rel(baseline, stimulus)
+        fr = stim_data.firing_rates(trailing_type, trailing_param, fr_type = 2)
+        base = np.zeros(len(fr))
+        statistics, p_value = sst.ttest_rel(fr, base)
         #print baseline.shape
         p_values.append(p_value)
     return np.asarray(p_values)
 
-# loop through spike data
-# loop through electrodes
-# check if electrode is responding
-# if responding, add header and spike
-# combine at the end
-def res_filter(split_data, p_value= 0.05):
+# filters out nonresponding electrodes using site_check method
+def res_filter(split_data, p_value= 0.01):
     # to prevent enormous amount of warnings
     import warnings; warnings.simplefilter('ignore')
     res_split_data = []
