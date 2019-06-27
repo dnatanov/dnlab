@@ -95,8 +95,8 @@ def make_bins(SpikeData, step_size=bin_size, **kwargs):
     bin_end = int(((longest_stim_dur+.1)/resolution)+bin_start)
     for trial in spikes:
         trial = trial[bin_start:bin_end]
-        n=trial.shape[0]*resolution/step_size
-        split_trial=np.array(np.split(trial, n))
+        nu=round(trial.shape[0]*resolution/step_size)
+        split_trial=np.array(np.split(trial, nu))
         ap_matrix.append(sst.zscore(np.sum(split_trial, axis=1)))
     bins=np.array(ap_matrix)
     return bins
@@ -243,7 +243,7 @@ def convert_electrodes(split_data, n = 100):
     return
 
 # does the knn algorithm on an array of experiments
-def batch_decoding_accuracy(split_data, n_neighbors=15, reps=250, training=.5):
+def batch_decoding_accuracy(split_data, region = "N/A", n_neighbors=15, reps=250, training=.5):
     # Runs the decoding accuracy KNN algorithm on an array of spike data objects
     # split_data is the spike data array, bird_ele_class is a dataframe containing all responding electrodes and the 
     # region they are from.    
@@ -251,7 +251,7 @@ def batch_decoding_accuracy(split_data, n_neighbors=15, reps=250, training=.5):
     # reps is the amount of repitions of the algorithm to run
     # training is the training proportion
     
-    c = ['birdid','electrode','region', 'hemisphere', 'average_adaptation_rate','average_decoding_accuracy','decoding_accuracy']
+    c = ['birdid','electrode', 'region', 'hemisphere', 'average_adaptation_rate','average_decoding_accuracy','decoding_accuracy']
     final_df = pd.DataFrame(columns = c)
     #loops through split data
     n = 1
@@ -265,10 +265,10 @@ def batch_decoding_accuracy(split_data, n_neighbors=15, reps=250, training=.5):
             decoding_acc = decoding_accuracy(ele_binned_data, k=n_neighbors, rep_num=reps, training_prop=training)
             avg_decoding_acc = np.mean(decoding_acc)
             if ele_num < 1600:
-                to_add = [bird_id, ele_num, df.region.iloc[0], "Left", get_adaptation_rate(ele_spike_data)[ele_num],avg_decoding_acc, decoding_acc]
+                to_add = [bird_id, ele_num, region, "Left", get_adaptation_rate(ele_spike_data)[ele_num],avg_decoding_acc, decoding_acc]
                 final_df = final_df.append(pd.DataFrame([to_add], columns=c)) 
             else:
-                to_add = [bird_id, ele_num, df.region.iloc[0], "Right", get_adaptation_rate(ele_spike_data)[ele_num], avg_decoding_acc, decoding_acc]
+                to_add = [bird_id, ele_num, region, "Right", get_adaptation_rate(ele_spike_data)[ele_num], avg_decoding_acc, decoding_acc]
                 final_df = final_df.append(pd.DataFrame([to_add], columns=c))
         print str(n)+" Experiments Analyzed"
         n+=1
