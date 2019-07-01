@@ -148,73 +148,44 @@ Input: SpikeData object corresponding to electrode, value of k, how many repetit
 
 Output: 2D array for decoding accuracy stim x trial number
 '''
-
-def decoding_accuracy(electrode, k=15, rep_num=1000, training_prop=.5, custom_stim_id=True):
-    # Generates parameters for acc and trial_sage
-    num_stim = electrode.stim.shape[0] 
+def decoding_accuracy(electrode, k=15, rep_num=250, training_prop=.5):
+    # Generates parameters for acc and trial_usage
+    num_stim = len(electrode.stim)
     total_trials = electrode.header.shape[0]
     trials_per_stim = total_trials/num_stim
     acc = np.zeros((num_stim, trials_per_stim))
     
-    #2D array #2D array, stim id x the trials per stimulus, increments up by one every time given trial used as target
-    trial_usage = np.ones((num_stim, trials_per_stim))
+    #2D array #2D arra`y, stim id x the trials per stimulus, increments up by one every time given trial used as target
+    trial_usage = np.zeros((num_stim, trials_per_stim))
     
-    indices = range(0, total_trials)
+    indices = electrode.header.index.values
     stim_ids = np.array(electrode.header.stim)
-    
-    custom_stim_dict = {}
-    
-    if custom_stim_id:
-        t=1
-        for stim in electrode.stim:
-            custom_stim_dict[stim] = t
-            t+=1
-
-    # Creates list of dicts of trial num to stimulus trial sxnum 
-    stim_to_trial = []
-    for stim_num in electrode.stim:
-            stim_dict = {}
-            stim_data = electrode.get_kw_BinnedData(keyword='stim', num=stim_num)
-            for trial_num in range (0,trials_per_stim):
-                try:
-                    overall_trial_num = stim_data.header.iloc[[trial_num]].trial.max()
-                except:
-                    continue
-                stim_dict[overall_trial_num] = trial_num
-            stim_to_trial.append(stim_dict)
 
     # knn algorithm
     for i in range(0,rep_num):
-        try:
-            #split data in half
-            training_bins, target_bins, training_idx, target_idx, training_stim_ids, target_stim_ids = split(electrode.bins, indices, stim_ids, train_size=training_prop, test_size=1-training_prop)
-            model = knn(n_neighbors=k, metric='euclidean')
-            model.fit(training_bins, training_stim_ids)
-            pred = model.predict(target_bins)
-        except:
-            continue
+ 
+        #split data in half and predict values
+        training_bins, target_bins, training_idx, target_idx, training_stim_ids, target_stim_ids = split(electrode.bins, indices, stim_ids, train_size=training_prop, test_size=1-training_prop)
+        model = knn(n_neighbors=k, metric='euclidean')
+        model.fit(training_bins, training_stim_ids)
+        pred = model.predict(target_bins)
+        
 
-        #Updates acc and trial usage
+        #Checks to see if predictions are correct
         for j in range(0, pred.shape[0]):
             stim_id= target_stim_ids[j]
-            trial_num = target_idx[j]+1
-            if custom_stim_id:
-                try:
-                    mod_stim_id = custom_stim_dict[stim_id]
-                    true_trial_num = stim_to_trial[mod_stim_id-1][trial_num]
-                    trial_usage[mod_stim_id-1][true_trial_num]+=1
-                except:
-                    continue
-            elif not custom_stim_id:
-                true_trial_num = stim_to_trial[stim_id-1][trial_num]
-                trial_usage[stim_id-1][true_trial_num]+=1
-            if pred[j] == stim_id and custom_stim_id:
-                acc[mod_stim_id-1][true_trial_num] += 1
-            if pred[j] == stim_id and not custom_stim_id:  
+            idx = target_idx[j]
+            stim_data = electrode.get_kw_SpikeData(stim=stim_id)
+            net_trial_num = stim_data.header.loc[idx:idx].trial.max()
+            mod_stim_data_header = stim_data.header.reset_index()
+            true_trial_num = mod_stim_data_header[(mod_stim_data_header["trial"] == net_trial_num)].index[0]
+            #increament trial usagebn
+            trial_usage[stim_id-1][true_trial_num]+=1
+            if pred[j] == stim_id:
                 acc[stim_id-1][true_trial_num] += 1
             
     final_acc = np.divide(acc, trial_usage)
-    return final_acc  
+    return final_acc 
 
 # takes npz data and splits it into a list
 def separate_npz_data(npz_data):
