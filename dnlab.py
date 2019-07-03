@@ -82,7 +82,7 @@ def Spike_to_Binned(SpikeData, step_size=bin_size):
 
 #bins and normalizes spikes into windows
 #can manually specify the duration of the longest stimulus or use the get_longest_stim function
-def make_bins(SpikeData, step_size=bin_size, **kwargs):
+def make_bins(SpikeData, step_size=bin_size):
     resolution = SpikeData.header.resolution.max()
     ap_matrix=[]
     spikes=SpikeData.spikes
@@ -103,7 +103,10 @@ def make_bins(SpikeData, step_size=bin_size, **kwargs):
 
 #returns the longest stim from a SpikeData object
 def get_longest_stim(SpikeData):
-    return round(SpikeData.extract_stim_dur(SpikeData.stim.max()),2)
+    stim_len = []
+    for stim in SpikeData.stim:
+        stim_len.append(SpikeData.extract_stim_dur(stim_code =stim))
+    return round(np.max(stim_len),2)
 
 # calculates average adaptation rates for each site from trials 5-25 in a SpikeData (or BinnedData)
 def get_adaptation_rate(SpikeData):
