@@ -72,9 +72,9 @@ class BinnedData(mdl.SpikeData):
     
 
 #converts a SpikeData object into a BinnedData object 
-def Spike_to_Binned(SpikeData, step_size=bin_size):
+def Spike_to_Binned(SpikeData, step_size=bin_size, custom_stim_length = None):
     resolution = round(SpikeData.header.resolution.max(),4)
-    bins=make_bins(SpikeData, step_size)
+    bins=make_bins(SpikeData, step_size, custom_stim_length)
     adaptation_rate=get_adaptation_rate(SpikeData)
     stim_adaptation_rate = get_stim_adaptation_rate(SpikeData)
     newBinnedData=BinnedData(SpikeData.header, SpikeData.spikes, bins, adaptation_rate, stim_adaptation_rate)
@@ -82,13 +82,13 @@ def Spike_to_Binned(SpikeData, step_size=bin_size):
 
 #bins and normalizes spikes into windows
 #can manually specify the duration of the longest stimulus or use the get_longest_stim function
-def make_bins(SpikeData, step_size=bin_size):
+def make_bins(SpikeData, step_size=bin_size, custom_stim_length = None):
     resolution = SpikeData.header.resolution.max()
     ap_matrix=[]
     spikes=SpikeData.spikes
     pre_stim_dur = SpikeData.header.pre_stim.max()
-    if 'longest_stim' in kwargs:
-        longest_stim_dur = kwargs['longest_stim']
+    if custom_stim_length is not None:
+        longest_stim_dur = custom_stim_length
     else:
         longest_stim_dur = get_longest_stim(SpikeData)
     bin_start = int(pre_stim_dur/resolution)
