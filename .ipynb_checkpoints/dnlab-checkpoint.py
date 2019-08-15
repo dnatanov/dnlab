@@ -97,8 +97,11 @@ def make_bins(SpikeData, step_size=bin_size, custom_stim_length = None):
         trial = trial[bin_start:bin_end]
         nu=round(trial.shape[0]*resolution/step_size)
         split_trial=np.array(np.split(trial, nu))
+        #adds spikes and normalizes to a z score
         ap_matrix.append(sst.zscore(np.sum(split_trial, axis=1)))
     bins=np.array(ap_matrix)
+    # replaces all instances with no spikes into a 0
+    bins = np.nan_to_num(bins)
     return bins
 
 #returns the longest stim from a SpikeData object
